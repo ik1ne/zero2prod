@@ -3,9 +3,13 @@ use sqlx::PgPool;
 
 use zero2prod::configuration::Settings;
 use zero2prod::startup::run;
+use zero2prod::telemetry;
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    let subscriber = telemetry::get_subscriber("zero2prod".into(), "info", std::io::stdout);
+    telemetry::init_subscriber(subscriber)?;
+
     let configuration = Settings::get_configuration()?;
     let pg_pool = PgPool::connect(&configuration.database.connection_string()).await?;
 

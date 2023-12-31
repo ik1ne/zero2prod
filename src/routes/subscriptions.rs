@@ -1,19 +1,35 @@
 use actix_web::{web, HttpResponse};
 use chrono::Utc;
-use sqlx::{query, PgPool};
+use sqlx::{Error, PgPool};
+use tracing::error;
 use uuid::Uuid;
 
-#[derive(serde::Deserialize)]
+#[derive(serde::Deserialize, Debug)]
 pub struct SubscribeFormData {
     email: String,
     name: String,
 }
 
+#[tracing::instrument(skip(pg_pool), fields(request_id = %Uuid::new_v4()))]
 pub async fn subscribe(
     form: web::Form<SubscribeFormData>,
-    connection: web::Data<PgPool>,
+    pg_pool: web::Data<PgPool>,
 ) -> HttpResponse {
-    let query_result = query!(
+    match insert_subscriber(form, pg_pool).await {
+        Ok(_) => HttpResponse::Ok().finish(),
+        Err(e) => {
+            error!(?e, "Failed to execute query");
+            HttpResponse::InternalServerError().finish()
+        }
+    }
+}
+
+#[tracing::instrument(skip_all)]
+async fn insert_subscriber(
+    form: web::Form<SubscribeFormData>,
+    pg_pool: web::Data<PgPool>,
+) -> Result<(), Error> {
+    sqlx::query!(
         r#"
         INSERT INTO subscriptions (id, email, name, subscribed_at)
         VALUES ($1, $2, $3, $4)
@@ -23,14 +39,12 @@ pub async fn subscribe(
         form.name,
         Utc::now(),
     )
-    .execute(connection.get_ref())
-    .await;
+    .execute(pg_pool.as_ref())
+    .await
+    .map_err(|e| {
+        error!(?e, "Failed to execute query");
+        e
+    })?;
 
-    match query_result {
-        Ok(_) => HttpResponse::Ok().finish(),
-        Err(e) => {
-            eprintln!("Failed to execute query: {}", e);
-            HttpResponse::InternalServerError().finish()
-        }
-    }
+    Ok(())
 }

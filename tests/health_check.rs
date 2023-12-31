@@ -1,5 +1,4 @@
 use anyhow::Result;
-use sqlx::query;
 
 use common::spawn_app;
 
@@ -43,7 +42,7 @@ async fn subscribe_returns_a_200_for_valid_form_data() -> Result<()> {
 
     assert_eq!(response.status().as_u16(), 200);
 
-    let saved = query!("SELECT email, name FROM subscriptions",)
+    let saved = sqlx::query!("SELECT email, name FROM subscriptions",)
         .fetch_one(&db_pool)
         .await?;
 

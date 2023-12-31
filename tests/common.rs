@@ -1,10 +1,14 @@
 use std::net::TcpListener;
+use std::sync::OnceLock;
 
 use anyhow::Result;
 use sqlx::{Connection, Error, Executor, PgConnection, PgPool, Pool, Postgres};
 
 use zero2prod::configuration::{DatabaseSettings, Settings};
 use zero2prod::startup::run;
+use zero2prod::telemetry::{get_subscriber, init_subscriber};
+
+static TRACING: OnceLock<()> = OnceLock::new();
 
 pub struct TestApp {
     pub address: String,
@@ -12,6 +16,19 @@ pub struct TestApp {
 }
 
 pub async fn spawn_app() -> Result<TestApp> {
+    TRACING.get_or_init(|| {
+        let subscriber_name = "test".into();
+        let default_filter_level = "info";
+
+        if std::env::var("TEST_LOG").is_ok() {
+            let subscriber = get_subscriber(subscriber_name, default_filter_level, std::io::stdout);
+            init_subscriber(subscriber).unwrap();
+        } else {
+            let subscriber = get_subscriber(subscriber_name, default_filter_level, std::io::sink);
+            init_subscriber(subscriber).unwrap();
+        };
+    });
+
     let listener = TcpListener::bind("127.0.0.1:0")?;
     let port = listener.local_addr()?.port();
     let address = format!("http://127.0.0.1:{}", port);
@@ -29,7 +46,6 @@ pub async fn spawn_app() -> Result<TestApp> {
     })
 }
 
-#[cfg(test)]
 async fn configure_database(db_settings: &mut DatabaseSettings) -> Result<Pool<Postgres>, Error> {
     let mut connection = PgConnection::connect(&db_settings.connection_string_without_db()).await?;
     connection

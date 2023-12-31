@@ -20,8 +20,11 @@ config = "0.13"
 serde = { version = "1", features = ["derive"] }
 sqlx = { version = "0.7", features = ["chrono", "macros", "migrate", "postgres", "runtime-tokio-rustls", "uuid"] }
 tokio = { version = "1", features = ["full"] }
+tracing = { version = "0.1" }
+tracing-bunyan-formatter = "0.3"
+tracing-log = "0.2"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "registry"] }
 uuid = { version = "1", features = ["v4"] }
-
 
 [dev-dependencies]
 reqwest = "0.11"
