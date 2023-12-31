@@ -1,18 +1,23 @@
-use std::net::{SocketAddr, TcpListener};
-
 use anyhow::Result;
-use sqlx::{query, Connection, PgConnection};
+use sqlx::query;
 
-use zero2prod::configuration::get_configuration;
+use common::spawn_app;
+
+use crate::common::TestApp;
+
+mod common;
 
 #[tokio::test]
 async fn health_check_works() -> Result<()> {
-    let addr = spawn_app()?;
+    let TestApp {
+        address,
+        db_pool: _,
+    } = spawn_app().await?;
 
     let client = reqwest::Client::new();
 
     let response = client
-        .get(format!("http://{}/health_check", addr))
+        .get(format!("{}/health_check", address))
         .send()
         .await?;
 
@@ -24,16 +29,13 @@ async fn health_check_works() -> Result<()> {
 
 #[tokio::test]
 async fn subscribe_returns_a_200_for_valid_form_data() -> Result<()> {
-    let addr = spawn_app()?;
-    let configuration = get_configuration()?;
-    let connection_string = configuration.database.connection_string();
-    let mut connection = PgConnection::connect(&connection_string).await?;
+    let TestApp { address, db_pool } = spawn_app().await?;
     let client = reqwest::Client::new();
 
     let body = "name=le%20guin&email=ursula_le_guin%40gmail.com";
 
     let response = client
-        .post(format!("http://{}/subscriptions", addr))
+        .post(format!("{}/subscriptions", address))
         .header("Content-Type", "application/x-www-form-urlencoded")
         .body(body)
         .send()
@@ -42,7 +44,7 @@ async fn subscribe_returns_a_200_for_valid_form_data() -> Result<()> {
     assert_eq!(response.status().as_u16(), 200);
 
     let saved = query!("SELECT email, name FROM subscriptions",)
-        .fetch_one(&mut connection)
+        .fetch_one(&db_pool)
         .await?;
 
     assert_eq!(saved.email, "ursula_le_guin@gmail.com");
@@ -53,7 +55,10 @@ async fn subscribe_returns_a_200_for_valid_form_data() -> Result<()> {
 
 #[tokio::test]
 async fn subscribe_returns_a_400_when_data_is_missing() -> Result<()> {
-    let addr = spawn_app()?;
+    let TestApp {
+        address,
+        db_pool: _,
+    } = spawn_app().await?;
 
     let client = reqwest::Client::new();
 
@@ -65,7 +70,7 @@ async fn subscribe_returns_a_400_when_data_is_missing() -> Result<()> {
 
     for (body, message) in test_cases {
         let response = client
-            .post(format!("http://{}/subscriptions", addr))
+            .post(format!("{}/subscriptions", address))
             .header("Content-Type", "application/x-www-form-urlencoded")
             .body(body)
             .send()
@@ -80,14 +85,4 @@ async fn subscribe_returns_a_400_when_data_is_missing() -> Result<()> {
     }
 
     Ok(())
-}
-
-pub fn spawn_app() -> Result<SocketAddr> {
-    let listener = TcpListener::bind("127.0.0.1:0")?;
-    let addr = listener.local_addr()?;
-    let server = zero2prod::startup::run(listener)?;
-
-    drop(tokio::spawn(server));
-
-    Ok(addr)
 }
