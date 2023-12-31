@@ -10,7 +10,7 @@ pub struct SubscribeFormData {
     name: String,
 }
 
-#[tracing::instrument(skip(pg_pool), fields(request_id = %Uuid::new_v4()))]
+#[tracing::instrument(skip(pg_pool))]
 pub async fn subscribe(
     form: web::Form<SubscribeFormData>,
     pg_pool: web::Data<PgPool>,

@@ -2,6 +2,7 @@ use std::net::TcpListener;
 use std::sync::OnceLock;
 
 use anyhow::Result;
+use secrecy::ExposeSecret;
 use sqlx::{Connection, Error, Executor, PgConnection, PgPool, Pool, Postgres};
 
 use zero2prod::configuration::{DatabaseSettings, Settings};
@@ -47,12 +48,13 @@ pub async fn spawn_app() -> Result<TestApp> {
 }
 
 async fn configure_database(db_settings: &mut DatabaseSettings) -> Result<Pool<Postgres>, Error> {
-    let mut connection = PgConnection::connect(&db_settings.connection_string_without_db()).await?;
+    let mut connection =
+        PgConnection::connect(db_settings.connection_string_without_db().expose_secret()).await?;
     connection
         .execute(format!(r#"CREATE DATABASE "{}";"#, db_settings.database_name).as_str())
         .await?;
 
-    let connection_pool = PgPool::connect(&db_settings.connection_string()).await?;
+    let connection_pool = PgPool::connect(db_settings.connection_string().expose_secret()).await?;
 
     sqlx::migrate!("./migrations").run(&connection_pool).await?;
 

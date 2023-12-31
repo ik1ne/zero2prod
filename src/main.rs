@@ -1,4 +1,5 @@
 use anyhow::Result;
+use secrecy::ExposeSecret;
 use sqlx::PgPool;
 
 use zero2prod::configuration::Settings;
@@ -11,7 +12,8 @@ async fn main() -> Result<()> {
     telemetry::init_subscriber(subscriber)?;
 
     let configuration = Settings::get_configuration()?;
-    let pg_pool = PgPool::connect(&configuration.database.connection_string()).await?;
+    let pg_pool =
+        PgPool::connect(configuration.database.connection_string().expose_secret()).await?;
 
     let address = format!("127.0.0.1:{}", configuration.application_port);
     let listener = std::net::TcpListener::bind(address)?;
