@@ -36,6 +36,7 @@ validator = "0.16"
 
 [dev-dependencies]
 fake = "2"
+linkify = "0.10"
 quickcheck = "1"
 quickcheck_macros = "1"
 wiremock = "0.5"

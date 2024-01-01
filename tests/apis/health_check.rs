@@ -1,18 +1,15 @@
 use anyhow::Result;
 
-use crate::common::{spawn_app, TestApp};
+use crate::common::TestApp;
 
 #[tokio::test]
 async fn health_check_works() -> Result<()> {
-    let TestApp {
-        address,
-        db_pool: _,
-    } = spawn_app().await?;
+    let test_app = TestApp::new().await?;
 
     let client = reqwest::Client::new();
 
     let response = client
-        .get(format!("{}/health_check", address))
+        .get(format!("{}/health_check", test_app.address))
         .send()
         .await?;
 

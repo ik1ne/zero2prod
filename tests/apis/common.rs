@@ -2,6 +2,7 @@ use std::sync::OnceLock;
 
 use anyhow::Result;
 use sqlx::{Connection, Error, Executor, PgConnection, PgPool, Pool, Postgres};
+use wiremock::MockServer;
 
 use zero2prod::configuration::{DatabaseSettings, Settings};
 use zero2prod::startup::{get_connection_pool, Application};
@@ -12,27 +13,45 @@ static TRACING: OnceLock<()> = OnceLock::new();
 pub struct TestApp {
     pub address: String,
     pub db_pool: PgPool,
+    pub email_server: MockServer,
 }
 
-pub async fn spawn_app() -> Result<TestApp> {
-    init_tracing();
+impl TestApp {
+    pub async fn new() -> Result<TestApp> {
+        init_tracing();
 
-    let mut configuration = Settings::get_configuration()?;
-    configuration.database.database_name = uuid::Uuid::new_v4().to_string();
-    configuration.application.port = 0;
+        let mut configuration = Settings::get_configuration()?;
+        configuration.database.database_name = uuid::Uuid::new_v4().to_string();
+        configuration.application.port = 0;
 
-    configure_database(&mut configuration.database).await?;
+        configure_database(&mut configuration.database).await?;
 
-    let application = Application::build(configuration.clone()).await?;
+        let email_server = MockServer::start().await;
+        configuration.email_client.base_url = email_server.uri();
 
-    let address = format!("http://127.0.0.1:{}", application.port());
+        let application = Application::build(configuration.clone()).await?;
 
-    drop(tokio::spawn(application.run_until_stopped()));
+        let address = format!("http://127.0.0.1:{}", application.port());
 
-    Ok(TestApp {
-        address,
-        db_pool: get_connection_pool(&configuration.database),
-    })
+        drop(tokio::spawn(application.run_until_stopped()));
+
+        Ok(TestApp {
+            address,
+            db_pool: get_connection_pool(&configuration.database),
+            email_server,
+        })
+    }
+
+    pub async fn post_subscriptions(&self, body: String) -> Result<reqwest::Response> {
+        let response = reqwest::Client::new()
+            .post(format!("{}/subscriptions", self.address))
+            .header("Content-Type", "application/x-www-form-urlencoded")
+            .body(body)
+            .send()
+            .await?;
+
+        Ok(response)
+    }
 }
 
 fn init_tracing() {
