@@ -1,12 +1,10 @@
-use std::net::TcpListener;
 use std::sync::OnceLock;
 
 use anyhow::Result;
 use sqlx::{Connection, Error, Executor, PgConnection, PgPool, Pool, Postgres};
 
 use zero2prod::configuration::{DatabaseSettings, Settings};
-use zero2prod::email_client::EmailClient;
-use zero2prod::startup::run;
+use zero2prod::startup::{get_connection_pool, Application};
 use zero2prod::telemetry::{get_subscriber, init_subscriber};
 
 static TRACING: OnceLock<()> = OnceLock::new();
@@ -17,6 +15,27 @@ pub struct TestApp {
 }
 
 pub async fn spawn_app() -> Result<TestApp> {
+    init_tracing();
+
+    let mut configuration = Settings::get_configuration()?;
+    configuration.database.database_name = uuid::Uuid::new_v4().to_string();
+    configuration.application.port = 0;
+
+    configure_database(&mut configuration.database).await?;
+
+    let application = Application::build(configuration.clone()).await?;
+
+    let address = format!("http://127.0.0.1:{}", application.port());
+
+    drop(tokio::spawn(application.run_until_stopped()));
+
+    Ok(TestApp {
+        address,
+        db_pool: get_connection_pool(&configuration.database),
+    })
+}
+
+fn init_tracing() {
     TRACING.get_or_init(|| {
         let subscriber_name = "test".into();
         let default_filter_level = "info";
@@ -29,30 +48,6 @@ pub async fn spawn_app() -> Result<TestApp> {
             init_subscriber(subscriber).unwrap();
         };
     });
-
-    let listener = TcpListener::bind("127.0.0.1:0")?;
-    let port = listener.local_addr()?.port();
-    let address = format!("http://127.0.0.1:{}", port);
-
-    let mut configuration = Settings::get_configuration()?;
-    configuration.database.database_name = uuid::Uuid::new_v4().to_string();
-    let pg_pool = configure_database(&mut configuration.database).await?;
-
-    let timeout = configuration.email_client.timeout();
-    let email_client = EmailClient::new(
-        configuration.email_client.base_url,
-        configuration.email_client.sender_email,
-        configuration.email_client.authorization_token,
-        timeout,
-    );
-
-    let server = run(listener, pg_pool.clone(), email_client)?;
-    drop(tokio::spawn(server));
-
-    Ok(TestApp {
-        address,
-        db_pool: pg_pool,
-    })
 }
 
 async fn configure_database(db_settings: &mut DatabaseSettings) -> Result<Pool<Postgres>, Error> {
