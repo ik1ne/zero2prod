@@ -10,3 +10,4 @@ email_client:
   base_url: "email_url_base"
   sender_email: "email_base"
   authorization_token: "token_base"
+  timeout_milliseconds: 10000

@@ -1,8 +1,6 @@
 use anyhow::Result;
 
-use common::{spawn_app, TestApp};
-
-mod common;
+use crate::common::{spawn_app, TestApp};
 
 #[tokio::test]
 async fn subscribe_returns_a_200_for_valid_form_data() -> Result<()> {

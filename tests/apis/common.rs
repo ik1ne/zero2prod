@@ -38,10 +38,12 @@ pub async fn spawn_app() -> Result<TestApp> {
     configuration.database.database_name = uuid::Uuid::new_v4().to_string();
     let pg_pool = configure_database(&mut configuration.database).await?;
 
+    let timeout = configuration.email_client.timeout();
     let email_client = EmailClient::new(
         configuration.email_client.base_url,
         configuration.email_client.sender_email,
         configuration.email_client.authorization_token,
+        timeout,
     );
 
     let server = run(listener, pg_pool.clone(), email_client)?;

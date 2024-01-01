@@ -21,10 +21,12 @@ async fn main() -> Result<()> {
 
     let pg_pool = PgPoolOptions::new().connect_lazy_with(configuration.database.with_db());
 
+    let timeout = configuration.email_client.timeout();
     let email_client = EmailClient::new(
         configuration.email_client.base_url,
         configuration.email_client.sender_email,
         configuration.email_client.authorization_token,
+        timeout,
     );
 
     run(listener, pg_pool, email_client)?.await?;
