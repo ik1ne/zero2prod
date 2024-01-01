@@ -5,6 +5,7 @@ use anyhow::Result;
 use sqlx::{Connection, Error, Executor, PgConnection, PgPool, Pool, Postgres};
 
 use zero2prod::configuration::{DatabaseSettings, Settings};
+use zero2prod::email_client::EmailClient;
 use zero2prod::startup::run;
 use zero2prod::telemetry::{get_subscriber, init_subscriber};
 
@@ -37,7 +38,13 @@ pub async fn spawn_app() -> Result<TestApp> {
     configuration.database.database_name = uuid::Uuid::new_v4().to_string();
     let pg_pool = configure_database(&mut configuration.database).await?;
 
-    let server = run(listener, pg_pool.clone())?;
+    let email_client = EmailClient::new(
+        configuration.email_client.base_url,
+        configuration.email_client.sender_email,
+        configuration.email_client.authorization_token,
+    );
+
+    let server = run(listener, pg_pool.clone(), email_client)?;
     drop(tokio::spawn(server));
 
     Ok(TestApp {
