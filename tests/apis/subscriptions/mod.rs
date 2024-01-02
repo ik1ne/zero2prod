@@ -136,24 +136,24 @@ async fn subscribe_sends_a_confirmation_email_with_a_link() -> Result<()> {
     let body: serde_json::Value =
         serde_json::from_slice(&email_request.body).context("Invalid JSON body")?;
 
-    let get_single_link = |s: &str| -> Result<String> {
-        let mut links = linkify::LinkFinder::new()
-            .links(s)
-            .filter(|l| *l.kind() == linkify::LinkKind::Url);
-
-        let link = links.next().context("No links found")?.as_str().to_string();
-
-        if links.next().is_some() {
-            bail!("More than one link found");
-        }
-
-        Ok(link)
-    };
-
     let html_link = get_single_link(body["HtmlBody"].as_str().context("No htmlBody")?)?;
     let text_link = get_single_link(body["TextBody"].as_str().context("No textBody")?)?;
 
     assert_eq!(html_link, text_link);
 
     Ok(())
+}
+
+fn get_single_link(s: &str) -> Result<String> {
+    let mut links = linkify::LinkFinder::new()
+        .links(s)
+        .filter(|l| *l.kind() == linkify::LinkKind::Url);
+
+    let link = links.next().context("No links found")?.as_str().to_string();
+
+    if links.next().is_some() {
+        bail!("More than one link found");
+    }
+
+    Ok(link)
 }
