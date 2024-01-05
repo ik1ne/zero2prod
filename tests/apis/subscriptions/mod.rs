@@ -2,7 +2,7 @@ use anyhow::{bail, Context, Result};
 use wiremock::matchers::{method, path};
 use wiremock::{Mock, ResponseTemplate};
 
-use crate::common::TestApp;
+use crate::common::{ConfirmationLinks, TestApp};
 
 mod confirm;
 
@@ -126,34 +126,16 @@ async fn subscribe_sends_a_confirmation_email_with_a_link() -> Result<()> {
 
     test_app.post_subscriptions(body.to_string()).await?;
 
-    let email_request = test_app
+    let requests = test_app
         .email_server
         .received_requests()
         .await
-        .context("No requests received")?
-        .pop()
-        .context("Empty requests received")?;
-    let body: serde_json::Value =
-        serde_json::from_slice(&email_request.body).context("Invalid JSON body")?;
+        .context("No requests")?;
+    let email_request = requests.first().context("Empty requests")?;
 
-    let html_link = get_single_link(body["HtmlBody"].as_str().context("No htmlBody")?)?;
-    let text_link = get_single_link(body["TextBody"].as_str().context("No textBody")?)?;
+    let confirmation_links = ConfirmationLinks::try_from(email_request, test_app.port)?;
 
-    assert_eq!(html_link, text_link);
+    assert_eq!(confirmation_links.html, confirmation_links.plain_text);
 
     Ok(())
-}
-
-fn get_single_link(s: &str) -> Result<String> {
-    let mut links = linkify::LinkFinder::new()
-        .links(s)
-        .filter(|l| *l.kind() == linkify::LinkKind::Url);
-
-    let link = links.next().context("No links found")?.as_str().to_string();
-
-    if links.next().is_some() {
-        bail!("More than one link found");
-    }
-
-    Ok(link)
 }

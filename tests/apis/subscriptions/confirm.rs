@@ -1,10 +1,8 @@
-use anyhow::{anyhow, Context, Result};
-use reqwest::Url;
+use anyhow::{Context, Result};
 use wiremock::matchers::path;
 use wiremock::Mock;
 
-use crate::common::TestApp;
-use crate::subscriptions::get_single_link;
+use crate::common::{ConfirmationLinks, TestApp};
 
 #[tokio::test]
 async fn confirmations_without_token_are_rejected_with_a_404() -> Result<()> {
@@ -32,32 +30,18 @@ async fn the_link_returned_by_subscribe_returns_a_200_if_called() -> Result<()> 
         .await;
 
     test_app.post_subscriptions(body.to_string()).await?;
-    let email_request = test_app
+
+    let requests = test_app
         .email_server
         .received_requests()
         .await
-        .context("No requests")?
-        .pop()
-        .context("Empty requests")?;
+        .context("No requests")?;
+    let email_request = requests.first().context("Empty requests")?;
 
-    let body: serde_json::Value =
-        serde_json::from_slice(&email_request.body).context("Invalid body")?;
-    let raw_confirmation_link = get_single_link(body["HtmlBody"].as_str().context("No htmlBody")?)?;
-    let mut confirmation_link = Url::parse(&raw_confirmation_link)?;
-    confirmation_link
-        .set_port(Some(test_app.port))
-        .map_err(|_| {
-            anyhow!(
-                "Failed to set port {} for confirmation link {}",
-                test_app.port,
-                raw_confirmation_link
-            )
-        })?;
-
-    assert_eq!(confirmation_link.host_str(), Some("127.0.0.1"));
+    let confirmation_link = ConfirmationLinks::try_from(email_request, test_app.port)?;
 
     let response = reqwest::Client::new()
-        .post(confirmation_link)
+        .post(dbg!(confirmation_link.html))
         .send()
         .await?;
 

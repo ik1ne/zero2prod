@@ -1,6 +1,6 @@
 use std::sync::OnceLock;
 
-use anyhow::Result;
+use anyhow::{bail, Context, Result};
 use sqlx::{Connection, Error, Executor, PgConnection, PgPool, Pool, Postgres};
 use wiremock::MockServer;
 
@@ -82,4 +82,40 @@ async fn configure_database(db_settings: &mut DatabaseSettings) -> Result<Pool<P
     sqlx::migrate!("./migrations").run(&connection_pool).await?;
 
     Ok(connection_pool)
+}
+
+pub struct ConfirmationLinks {
+    pub html: reqwest::Url,
+    pub plain_text: reqwest::Url,
+}
+
+impl ConfirmationLinks {
+    pub fn try_from(value: &wiremock::Request, port: u16) -> Result<Self> {
+        let body: serde_json::Value =
+            serde_json::from_slice(&value.body).context("Invalid body")?;
+
+        let html = get_single_link(body["HtmlBody"].as_str().context("No htmlBody")?, port)?;
+        let plain_text = get_single_link(body["TextBody"].as_str().context("No textBody")?, port)?;
+
+        Ok(Self { html, plain_text })
+    }
+}
+
+fn get_single_link(s: &str, port: u16) -> Result<reqwest::Url> {
+    let mut links = linkify::LinkFinder::new()
+        .links(s)
+        .filter(|l| *l.kind() == linkify::LinkKind::Url);
+
+    let link = links.next().context("No links found")?.as_str().to_string();
+
+    if links.next().is_some() {
+        bail!("More than one link found");
+    }
+
+    let mut url = reqwest::Url::parse(&link)?;
+
+    url.set_port(Some(port))
+        .map_err(|_| anyhow::anyhow!("Cannot set port"))?;
+
+    Ok(url)
 }
