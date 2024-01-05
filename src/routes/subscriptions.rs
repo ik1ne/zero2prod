@@ -7,6 +7,7 @@ use uuid::Uuid;
 
 use crate::domain::NewSubscriber;
 use crate::email_client::EmailClient;
+use crate::startup::ApplicationBaseUrl;
 
 #[derive(serde::Deserialize, Debug)]
 pub struct SubscribeFormData {
@@ -19,6 +20,7 @@ pub async fn subscribe(
     form: web::Form<SubscribeFormData>,
     pg_pool: web::Data<PgPool>,
     email_client: web::Data<EmailClient>,
+    base_url: web::Data<ApplicationBaseUrl>,
 ) -> HttpResponse {
     let Ok(new_subscriber) = NewSubscriber::try_from(form.0) else {
         return HttpResponse::BadRequest().finish();
@@ -29,7 +31,7 @@ pub async fn subscribe(
         return HttpResponse::InternalServerError().finish();
     }
 
-    if let Err(e) = send_confirmation_email(&email_client, new_subscriber).await {
+    if let Err(e) = send_confirmation_email(&email_client, new_subscriber, &base_url.0).await {
         error!(?e, "Failed to send a confirmation email");
         return HttpResponse::InternalServerError().finish();
     }
@@ -63,8 +65,9 @@ async fn insert_subscriber(new_subscriber: &NewSubscriber, pg_pool: &PgPool) -> 
 pub async fn send_confirmation_email(
     email_client: &EmailClient,
     new_subscriber: NewSubscriber,
+    base_url: &str,
 ) -> Result<()> {
-    let confirmation_link = "https://there-is-no-such-domain.com/subscriptions/confirm";
+    let confirmation_link = format!("{}/subscriptions/confirm", base_url);
     email_client
         .send_email(
             new_subscriber.email.as_ref(),

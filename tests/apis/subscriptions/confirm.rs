@@ -7,7 +7,7 @@ use wiremock::matchers::path;
 use wiremock::Mock;
 
 #[tokio::test]
-async fn confirmations_without_token_are_rejected_with_a_400() -> Result<()> {
+async fn confirmations_without_token_are_rejected_with_a_404() -> Result<()> {
     let app = TestApp::new().await?;
 
     let response = reqwest::Client::new()
@@ -15,7 +15,7 @@ async fn confirmations_without_token_are_rejected_with_a_400() -> Result<()> {
         .send()
         .await?;
 
-    assert_eq!(response.status().as_u16(), 400);
+    assert_eq!(response.status().as_u16(), 404);
 
     Ok(())
 }
@@ -47,7 +47,10 @@ async fn the_link_returned_by_subscribe_returns_a_200_if_called() -> Result<()> 
 
     assert_eq!(confirmation_link.host_str(), Some("localhost"));
 
-    let response = reqwest::get(confirmation_link).await?;
+    let response = reqwest::Client::new()
+        .post(confirmation_link)
+        .send()
+        .await?;
 
     assert_eq!(response.status().as_u16(), 200);
 
