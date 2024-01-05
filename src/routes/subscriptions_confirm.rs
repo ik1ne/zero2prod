@@ -7,6 +7,6 @@ pub struct Parameters {
 }
 
 #[tracing::instrument(skip_all)]
-pub async fn confirm(_parameters: web::Path<Parameters>) -> HttpResponse {
+pub async fn confirm(_parameters: web::Query<Parameters>) -> HttpResponse {
     HttpResponse::Ok().finish()
 }

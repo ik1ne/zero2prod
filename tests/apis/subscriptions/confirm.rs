@@ -5,15 +5,12 @@ use wiremock::Mock;
 use crate::common::{ConfirmationLinks, TestApp};
 
 #[tokio::test]
-async fn confirmations_without_token_are_rejected_with_a_404() -> Result<()> {
+async fn confirmations_without_token_are_rejected_with_a_400() -> Result<()> {
     let app = TestApp::new().await?;
 
-    let response = reqwest::Client::new()
-        .post(&format!("{}/subscriptions/confirm", app.address))
-        .send()
-        .await?;
+    let response = reqwest::get(&format!("{}/subscriptions/confirm", app.address)).await?;
 
-    assert_eq!(response.status().as_u16(), 404);
+    assert_eq!(response.status().as_u16(), 400);
 
     Ok(())
 }
@@ -40,10 +37,7 @@ async fn the_link_returned_by_subscribe_returns_a_200_if_called() -> Result<()> 
 
     let confirmation_link = ConfirmationLinks::try_from(email_request, test_app.port)?;
 
-    let response = reqwest::Client::new()
-        .post(dbg!(confirmation_link.html))
-        .send()
-        .await?;
+    let response = reqwest::get(confirmation_link.html).await?;
 
     assert_eq!(response.status().as_u16(), 200);
 
@@ -71,10 +65,7 @@ async fn clicking_on_the_confirmation_link_confirms_a_subscriber() -> Result<()>
     let confirmation_link =
         ConfirmationLinks::try_from(request.first().context("Empty requests")?, test_app.port)?;
 
-    reqwest::Client::new()
-        .post(confirmation_link.html)
-        .send()
-        .await?;
+    reqwest::get(confirmation_link.html).await?;
 
     let saved = sqlx::query!("SELECT email, name, status FROM subscriptions")
         .fetch_one(&test_app.db_pool)
