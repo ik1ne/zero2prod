@@ -112,6 +112,7 @@ async fn subscribe_sends_a_confirmation_email_for_valid_data() -> Result<()> {
 
     Ok(())
 }
+
 #[tokio::test]
 async fn subscribe_sends_a_confirmation_email_with_a_link() -> Result<()> {
     let test_app = TestApp::new().await?;

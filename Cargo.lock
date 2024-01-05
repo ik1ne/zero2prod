@@ -270,6 +270,9 @@ name = "anyhow"
 version = "1.0.77"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c9d19de80eff169429ac1e9f48fffb163916b448a44e8e046186232046d9e1f9"
+dependencies = [
+ "backtrace",
+]
 
 [[package]]
 name = "assert-json-diff"
@@ -3395,6 +3398,7 @@ dependencies = [
  "linkify",
  "quickcheck",
  "quickcheck_macros",
+ "rand 0.8.5",
  "reqwest",
  "secrecy",
  "serde",

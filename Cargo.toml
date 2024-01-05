@@ -13,11 +13,12 @@ path = "src/main.rs"
 name = "zero2prod"
 
 [dependencies]
-anyhow = "1"
+anyhow = { version = "1", features = ["backtrace"] }
 actix-web = "4"
 chrono = { version = "0.4", features = ["clock"] }
 config = "0.13"
 claims = "0.7"
+rand = { version = "0.8", features = ["std_rng"] }
 reqwest = { version = "0.11", features = ["json", "rustls-tls"] }
 secrecy = { version = "0.8", features = ["serde"] }
 serde = { version = "1", features = ["derive"] }
