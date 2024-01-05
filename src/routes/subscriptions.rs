@@ -67,7 +67,7 @@ pub async fn send_confirmation_email(
     new_subscriber: NewSubscriber,
     base_url: &str,
 ) -> Result<()> {
-    let confirmation_link = format!("{}/subscriptions/confirm", base_url);
+    let confirmation_link = format!("{}/subscriptions/confirm/my_token", base_url);
     email_client
         .send_email(
             new_subscriber.email.as_ref(),

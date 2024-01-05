@@ -12,6 +12,7 @@ static TRACING: OnceLock<()> = OnceLock::new();
 
 pub struct TestApp {
     pub address: String,
+    pub port: u16,
     pub db_pool: PgPool,
     pub email_server: MockServer,
 }
@@ -30,13 +31,14 @@ impl TestApp {
         configuration.email_client.base_url = email_server.uri();
 
         let application = Application::build(configuration.clone()).await?;
-
-        let address = format!("http://127.0.0.1:{}", application.port());
+        let port = application.port();
+        let address = format!("http://127.0.0.1:{}", port);
 
         drop(tokio::spawn(application.run_until_stopped()));
 
         Ok(TestApp {
             address,
+            port,
             db_pool: get_connection_pool(&configuration.database),
             email_server,
         })

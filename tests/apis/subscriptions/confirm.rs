@@ -1,10 +1,10 @@
-use crate::common::TestApp;
-
-use crate::subscriptions::get_single_link;
-use anyhow::{Context, Result};
+use anyhow::{anyhow, Context, Result};
 use reqwest::Url;
 use wiremock::matchers::path;
 use wiremock::Mock;
+
+use crate::common::TestApp;
+use crate::subscriptions::get_single_link;
 
 #[tokio::test]
 async fn confirmations_without_token_are_rejected_with_a_404() -> Result<()> {
@@ -43,9 +43,18 @@ async fn the_link_returned_by_subscribe_returns_a_200_if_called() -> Result<()> 
     let body: serde_json::Value =
         serde_json::from_slice(&email_request.body).context("Invalid body")?;
     let raw_confirmation_link = get_single_link(body["HtmlBody"].as_str().context("No htmlBody")?)?;
-    let confirmation_link = Url::parse(&raw_confirmation_link)?;
+    let mut confirmation_link = Url::parse(&raw_confirmation_link)?;
+    confirmation_link
+        .set_port(Some(test_app.port))
+        .map_err(|_| {
+            anyhow!(
+                "Failed to set port {} for confirmation link {}",
+                test_app.port,
+                raw_confirmation_link
+            )
+        })?;
 
-    assert_eq!(confirmation_link.host_str(), Some("localhost"));
+    assert_eq!(confirmation_link.host_str(), Some("127.0.0.1"));
 
     let response = reqwest::Client::new()
         .post(confirmation_link)
